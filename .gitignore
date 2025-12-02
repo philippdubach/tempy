@@ -1,0 +1,46 @@
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+
+# Build artifacts
+*.app
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.framework
+*.swiftmodule
+*.swiftdoc
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Temporary files
+*.swp
+*~.nib
+*.tmp
+*.temp
+
+# IDE
+.idea/
+.vscode/
+
+# Backend
+backend/**/node_modules/
+backend/**/.wrangler/
+backend/**/.env
+!backend/**/.env.example
+backend/**/.env.local
+backend/**/dist/
+

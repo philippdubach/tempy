@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+        }
+        
+        .temperature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .temp-card {
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .temp-label {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .temp-value {
+            font-size: 3.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .temp-unit {
+            font-size: 0.5em;
+            color: #999;
+        }
+        
+        .status {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+        
+        .loading {
+            color: #999;
+        }
+        
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            .temperature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .temp-value {
+                font-size: 2.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Temperature Monitor</h1>
+        <div class="temperature-grid">
+            <div class="temp-card">
+                <div class="temp-label">Inside</div>
+                <div class="temp-value">
+                    <span id="inside-temp" class="loading">--</span><span class="temp-unit">°C</span>
+                </div>
+            </div>
+            <div class="temp-card">
+                <div class="temp-label">Outside</div>
+                <div class="temp-value">
+                    <span id="outside-temp" class="loading">--</span><span class="temp-unit">°C</span>
+                </div>
+            </div>
+        </div>
+        <div class="status" id="status">Loading...</div>
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            // Option 1: Use a backend proxy (recommended for security)
+            // Set this to your backend endpoint that handles Shelly API calls
+            apiEndpoint: 'YOUR_BACKEND_ENDPOINT_HERE',
+            
+            // Option 2: Direct API calls (requires CORS support or browser extension)
+            // Uncomment and configure these if using direct API calls
+            // shellyCloudUrl: 'https://api.shelly.cloud',
+            // authToken: 'YOUR_AUTH_TOKEN',
+            // deviceIdInside: 'YOUR_INSIDE_DEVICE_ID',
+            // deviceIdOutside: 'YOUR_OUTSIDE_DEVICE_ID',
+            
+            updateInterval: 60000 // Update every 60 seconds
+        };
+
+        async function fetchTemperature() {
+            const statusEl = document.getElementById('status');
+            const errorEl = document.getElementById('error');
+            const insideTempEl = document.getElementById('inside-temp');
+            const outsideTempEl = document.getElementById('outside-temp');
+            
+            try {
+                statusEl.textContent = 'Updating...';
+                errorEl.style.display = 'none';
+                
+                let data;
+                
+                // Check if using backend proxy
+                if (CONFIG.apiEndpoint && CONFIG.apiEndpoint !== 'YOUR_BACKEND_ENDPOINT_HERE') {
+                    // Fetch from backend proxy
+                    const response = await fetch(CONFIG.apiEndpoint);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    data = await response.json();
+                } else {
+                    // Direct API call (if configured)
+                    // Note: This may not work due to CORS restrictions
+                    // You may need a backend proxy for production use
+                    throw new Error('Please configure API endpoint. See instructions in README.');
+                }
+                
+                // Update temperature displays
+                if (data.inside !== undefined && data.inside !== null) {
+                    insideTempEl.textContent = data.inside.toFixed(1);
+                    insideTempEl.classList.remove('loading');
+                }
+                
+                if (data.outside !== undefined && data.outside !== null) {
+                    outsideTempEl.textContent = data.outside.toFixed(1);
+                    outsideTempEl.classList.remove('loading');
+                }
+                
+                const now = new Date();
+                statusEl.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('Error fetching temperature:', error);
+                errorEl.textContent = `Error: ${error.message}`;
+                errorEl.style.display = 'block';
+                statusEl.textContent = 'Error loading data';
+            }
+        }
+
+        // Initial fetch
+        fetchTemperature();
+        
+        // Set up periodic updates
+        setInterval(fetchTemperature, CONFIG.updateInterval);
+    </script>
+</body>
+</html>

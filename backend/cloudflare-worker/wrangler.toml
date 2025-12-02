@@ -1,0 +1,20 @@
+name = "shelly-temperature-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for storing historical data
+# Create your own KV namespace and replace the ID below
+[[kv_namespaces]]
+binding = "TEMPERATURE_HISTORY"
+id = "your-kv-namespace-id-here"
+
+# Environment variables (set these using: wrangler secret put <NAME>)
+# SHELLY_SERVER_URL - Your Shelly Cloud server URL (e.g., https://shelly-211-eu.shelly.cloud)
+# SHELLY_AUTH_KEY - Your Shelly Cloud API auth key
+# SHELLY_INSIDE_DEVICE_ID - Device ID for inside sensor
+# SHELLY_OUTSIDE_DEVICE_ID - Device ID for outside sensor
+
+# Optional: Add route if you want a custom domain
+# routes = [
+#   { pattern = "temperature.yourdomain.com", custom_domain = true }
+# ]

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Monitor</title>
+</head>
+<body>
+    <h1>Temperature Monitor</h1>
+    
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <div class="current-temps">
+        <div class="temp-card">
+            <div class="temp-label">Outside</div>
+            <div class="temp-value">
+                <span id="outside-temp">--</span><span class="temp-unit">°C</span>
+            </div>
+        </div>
+        <div class="temp-card">
+            <div class="temp-label">Inside</div>
+            <div class="temp-value">
+                <span id="inside-temp">--</span><span class="temp-unit">°C</span>
+            </div>
+        </div>
+    </div>
+    <br>
+    <br>
+    <div class="chart-container">
+        <div class="chart-title">24 Hour Temperature History</div>
+        <canvas id="temperatureChart"></canvas>
+    </div>
+    
+    <div class="status" id="status">Loading...</div>
+
+    <script>
+        const CONFIG = {
+            apiEndpoint: 'https://your-worker.workers.dev',
+            historyEndpoint: 'https://your-worker.workers.dev/history',
+            updateInterval: 120000, // 2 minutes - respects API rate limit (1 req/sec)
+            maxHistoryHours: 24
+        };
+
+        let historyData = [];
+
+        // Fetch historical data from API
+        async function fetchHistory() {
+            try {
+                const response = await fetch(CONFIG.historyEndpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    // Filter to last 24 hours
+                    const cutoff = Date.now() - (CONFIG.maxHistoryHours * 60 * 60 * 1000);
+                    historyData = data.filter(entry => entry.timestamp > cutoff);
+                } else {
+                    historyData = [];
+                }
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                historyData = [];
+            }
+        }
+
+        // Draw temperature chart
+        function drawChart() {
+            const canvas = document.getElementById('temperatureChart');
+            if (!canvas) {
+                console.error('Canvas element not found');
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Could not get canvas context');
+                return;
+            }
+            
+            // Set canvas size
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0) {
+                // Canvas not yet visible, try again later
+                setTimeout(drawChart, 100);
+                return;
+            }
+            canvas.width = rect.width;
+            canvas.height = 300;
+            
+            if (historyData.length === 0) {
+                ctx.fillStyle = '#999';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data yet. Waiting for first reading...', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const padding = { top: 20, right: 40, bottom: 40, left: 50 };
+            const chartWidth = canvas.width - padding.left - padding.right;
+            const chartHeight = canvas.height - padding.top - padding.bottom;
+            
+            // Find min/max temperatures for scaling
+            const allTemps = historyData.flatMap(h => [h.inside, h.outside]).filter(t => t != null);
+            const minTemp = Math.min(...allTemps) - 2;
+            const maxTemp = Math.max(...allTemps) + 2;
+            const tempRange = maxTemp - minTemp;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            const gridLines = 5;
+            for (let i = 0; i <= gridLines; i++) {
+                const y = padding.top + (chartHeight / gridLines) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartWidth, y);
+                ctx.stroke();
+                
+                // Temperature labels
+                const temp = maxTemp - (tempRange / gridLines) * i;
+                ctx.fillStyle = '#666';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(temp.toFixed(1) + '°C', padding.left - 10, y + 4);
+            }
+            
+            // Draw time labels
+            const now = Date.now();
+            const hours24 = 24 * 60 * 60 * 1000;
+            const timeLabels = 6;
+            for (let i = 0; i <= timeLabels; i++) {
+                const x = padding.left + (chartWidth / timeLabels) * i;
+                const timeAgo = now - (hours24 / timeLabels) * (timeLabels - i);
+                const date = new Date(timeAgo);
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                
+                ctx.fillStyle = '#666';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${hours}:${minutes}`, x, canvas.height - padding.bottom + 20);
+                
+                // Vertical grid line
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, padding.top + chartHeight);
+                ctx.stroke();
+            }
+            
+            // Draw temperature lines
+            if (historyData.length > 1) {
+                // Outside temperature line (blue)
+                ctx.strokeStyle = '#2196F3';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                historyData.forEach((entry, index) => {
+                    const x = padding.left + (chartWidth / (historyData.length - 1)) * index;
+                    const y = padding.top + chartHeight - ((entry.outside - minTemp) / tempRange) * chartHeight;
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+                
+                // Inside temperature line (orange)
+                ctx.strokeStyle = '#FF9800';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                historyData.forEach((entry, index) => {
+                    const x = padding.left + (chartWidth / (historyData.length - 1)) * index;
+                    const y = padding.top + chartHeight - ((entry.inside - minTemp) / tempRange) * chartHeight;
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+                
+                // Draw points
+                historyData.forEach((entry, index) => {
+                    const x = padding.left + (chartWidth / (historyData.length - 1)) * index;
+                    
+                    // Outside point
+                    const yOut = padding.top + chartHeight - ((entry.outside - minTemp) / tempRange) * chartHeight;
+                    ctx.fillStyle = '#2196F3';
+                    ctx.beginPath();
+                    ctx.arc(x, yOut, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Inside point
+                    const yIn = padding.top + chartHeight - ((entry.inside - minTemp) / tempRange) * chartHeight;
+                    ctx.fillStyle = '#FF9800';
+                    ctx.beginPath();
+                    ctx.arc(x, yIn, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+            
+            // Legend
+            ctx.fillStyle = '#2196F3';
+            ctx.fillRect(padding.left, 10, 15, 3);
+            ctx.fillStyle = '#333';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('Outside', padding.left + 20, 12);
+            
+            ctx.fillStyle = '#FF9800';
+            ctx.fillRect(padding.left + 80, 10, 15, 3);
+            ctx.fillStyle = '#333';
+            ctx.fillText('Inside', padding.left + 100, 12);
+        }
+
+        async function fetchTemperature() {
+            const statusEl = document.getElementById('status');
+            const errorEl = document.getElementById('error');
+            const insideTempEl = document.getElementById('inside-temp');
+            const outsideTempEl = document.getElementById('outside-temp');
+            
+            try {
+                statusEl.textContent = 'Updating...';
+                errorEl.style.display = 'none';
+                
+                    const response = await fetch(CONFIG.apiEndpoint);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.details || data.error);
+                }
+                    
+                    if (data.inside !== undefined && data.inside !== null) {
+                        insideTempEl.textContent = data.inside.toFixed(1);
+                    }
+                    
+                    if (data.outside !== undefined && data.outside !== null) {
+                        outsideTempEl.textContent = data.outside.toFixed(1);
+                    }
+                
+                // Fetch updated history and redraw chart
+                await fetchHistory();
+                drawChart();
+                    
+                    const now = new Date();
+                    statusEl.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+            } catch (error) {
+                // Handle rate limit errors gracefully
+                if (error.message.includes('rate limit') || error.message.includes('TOO_MANY_REQUESTS')) {
+                    statusEl.textContent = 'Rate limited - waiting before next update...';
+                    setTimeout(fetchTemperature, 60000); // Wait 1 minute
+                    return;
+                }
+                errorEl.textContent = 'Error: ' + error.message;
+                errorEl.style.display = 'block';
+                statusEl.textContent = 'Error loading data';
+            }
+        }
+
+        // Initial load
+        async function init() {
+            try {
+                await fetchHistory();
+                // Wait a bit for canvas to be ready
+                setTimeout(() => {
+                    drawChart();
+                }, 100);
+        fetchTemperature();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('status').textContent = 'Error initializing: ' + error.message;
+            }
+        }
+        
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        
+        // Set up periodic updates
+        setInterval(fetchTemperature, CONFIG.updateInterval);
+        
+        // Redraw chart on window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(drawChart, 250);
+        });
+    </script>
+</body>
+</html>

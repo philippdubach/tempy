@@ -1,0 +1,17 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Swift files
+*.swift text eol=lf
+
+# Xcode project files (binary)
+*.pbxproj -text
+*.xcbkptlist -text
+*.xcworkspace -text
+
+# Assets
+*.png binary
+*.jpg binary
+*.icns binary
+*.car binary
+

@@ -1,0 +1,11 @@
+{
+  "name": "shelly-temperature-monitor",
+  "version": "1.0.0",
+  "description": "Temperature monitor for Shelly BLU H&T sensors",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
